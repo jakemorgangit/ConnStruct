@@ -15,7 +15,8 @@ ConnStruct is a desktop application designed to help you manage and organize you
 
 The goal of ConnStruct is to provide a seamless connection experience by securely storing your credentials (including passwords and SSH key passphrases) and pre-filling them when launching sessions, minimising the need for repeated manual entry.
 
-![image](https://github.com/user-attachments/assets/d301e77e-9c39-4c33-a40b-3ec62fff5b8f)
+![image](https://github.com/user-attachments/assets/829de562-9f2d-46e1-a4fc-77b658c662b9)
+
 
 ## Features
 
