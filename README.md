@@ -1,8 +1,11 @@
 # ConnStruct - Structured Connection Manager
 
 **SSH and RDP - Organise. Connect. Control.**
+
 **Version:** 1.4.1
+
 **Author:** Jake Morgan ([https://dba.wales](https://dba.wales))
+
 
 ## Overview
 
