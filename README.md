@@ -6,7 +6,7 @@
 
 **Author:** Jake Morgan [https://dba.wales](https://dba.wales)
 
-Donwload the Windows Executable here:  [https://dba.walesConnStruct/downloads/ConnStruct_1.4.1.exe](https://dba.walesConnStruct/downloads/ConnStruct_1.4.1.exe)
+Donwload the Windows Executable here:  [https://dba.wales/ConnStruct/downloads/ConnStruct_1.4.1.exe](https://dba.wales/ConnStruct/downloads/ConnStruct_1.4.1.exe)
 
 
 ## Overview
