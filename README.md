@@ -4,7 +4,9 @@
 
 **Version:** 1.4.1
 
-**Author:** Jake Morgan ([https://dba.wales](https://dba.wales))
+**Author:** Jake Morgan [https://dba.wales](https://dba.wales)
+
+Donwload the Windows Executable here: [https://dba.wales/ConnStruct/downloads/ConnStruct_1.4.1.exe]([https://dba.wales](https://dba.wales/ConnStruct/downloads/ConnStruct_1.4.1.exe)
 
 
 ## Overview
