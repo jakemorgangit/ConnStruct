@@ -1,3 +1,5 @@
+# ConnStruct.py (Ported to PySide6 with RDP credential fix and Dialog branding)
+
 import sys
 import json
 import os
@@ -8,17 +10,19 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 
-from PyQt5.QtWidgets import (
+# --- PySide6 Imports ---
+from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTreeWidget, QTreeWidgetItem, QPushButton, QTabWidget, QLabel,
-    QSplitter, QMenu, QAction, QInputDialog, QLineEdit,
+    QSplitter, QMenu, QInputDialog, QLineEdit,
     QFormLayout, QComboBox, QMessageBox, QGroupBox, QScrollArea,
     QAbstractItemView, QDialog, QDialogButtonBox, QFileDialog, QTreeWidgetItemIterator,
-    QColorDialog # Added for color picker
+    QColorDialog
 )
-from PyQt5.QtCore import Qt, QUrl, QMimeData, QTimer, QPoint
-from PyQt5.QtGui import QIcon, QPixmap, QFont, QPainter, QPolygon, QBrush, QPen, QColor # Added QColor
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtCore import Qt, QUrl, QMimeData, QTimer, QPoint
+from PySide6.QtGui import QIcon, QPixmap, QFont, QPainter, QPolygon, QBrush, QPen, QColor, QAction
+from PySide6.QtWebEngineWidgets import QWebEngineView
+# --- End PySide6 Imports ---
 
 import socket
 import time
@@ -29,7 +33,7 @@ import multiprocessing
 CONNECTIONS_FILE = "connections.json"
 SETTINGS_FILE = "settings.json"
 APP_NAME = "ConnStruct"
-APP_VERSION = "1.4.1" # Incremented
+APP_VERSION = "1.5.0" # Version updated
 APP_AUTHOR = "Jake Morgan"
 APP_WEBSITE = "https://dba.wales"
 WEBSSH_HOST = "localhost"
@@ -57,17 +61,13 @@ def get_icon(name, color_hex=None):
             pixmap.fill(QColor(color_hex))
         except Exception as e:
             logging.warning(f"Invalid icon color hex '{color_hex}', using default for {name}: {e}")
-            default_color = Qt.blue if name == "ssh" else Qt.darkGreen
+            default_color = QColor("blue") if name == "ssh" else QColor("darkGreen")
             pixmap.fill(default_color)
         return QIcon(pixmap)
-    if name=="ssh":pix=QPixmap(16,16);pix.fill(Qt.blue);return QIcon(pix)
-    if name=="rdp":pix=QPixmap(16,16);pix.fill(Qt.darkGreen);return QIcon(pix)
-    if name=="folder":pix=QPixmap(16,16);pix.fill(Qt.yellow);return QIcon(pix)
+    if name=="ssh":pix=QPixmap(16,16);pix.fill(QColor("blue"));return QIcon(pix)
+    if name=="rdp":pix=QPixmap(16,16);pix.fill(QColor("darkGreen"));return QIcon(pix)
+    if name=="folder":pix=QPixmap(16,16);pix.fill(QColor("yellow"));return QIcon(pix)
     if name=="app_icon":
-        # IMPORTANT: For PyInstaller, if 'folder_shell_icon.ico' is a loose file,
-        # ensure it's added to 'datas' in your .spec file:
-        # datas=[('webssh', 'webssh'), ('folder_shell_icon.ico', '.')]
-        # And ensure get_application_path() is used to locate it.
         icon_path = os.path.join(get_application_path(), "folder_shell_icon.ico")
         if os.path.exists(icon_path):
             loaded_icon = QIcon(icon_path)
@@ -78,11 +78,10 @@ def get_icon(name, color_hex=None):
                 logging.warning(f"App icon at {icon_path} is null/invalid.")
         else:
             logging.warning(f"App icon not found at {icon_path}.")
-        # Fallback placeholder if ICO loading fails or file not found
-        pix=QPixmap(32,32);pix.fill(Qt.darkCyan);return QIcon(pix)
+        pix=QPixmap(32,32);pix.fill(QColor("darkCyan"));return QIcon(pix)
     if name=="star":
-        pix=QPixmap(16,16);pix.fill(Qt.transparent);p=QPainter(pix);p.setRenderHint(QPainter.Antialiasing)
-        pen=QPen(Qt.yellow);pen.setWidth(1);p.setPen(pen);p.setBrush(QBrush(Qt.yellow))
+        pix=QPixmap(16,16);pix.fill(Qt.GlobalColor.transparent);p=QPainter(pix);p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pen=QPen(QColor("yellow"));pen.setWidth(1);p.setPen(pen);p.setBrush(QBrush(QColor("yellow")))
         pts=[QPoint(8,1),QPoint(10,6),QPoint(15,6),QPoint(11,10),QPoint(13,15),QPoint(8,12),QPoint(3,15),QPoint(5,10),QPoint(1,6),QPoint(6,6)]
         p.drawPolygon(QPolygon(pts));p.end();return QIcon(pix)
     return QIcon()
@@ -134,15 +133,22 @@ def save_initial_settings(d):
 class MasterPasswordDialog(QDialog):
     def __init__(self, parent=None, is_setting_up=False):
         super().__init__(parent)
-        self.is_setting_up = is_setting_up; self.setWindowTitle("Master Password"); self.setModal(True)
+        self.is_setting_up = is_setting_up
+
+        # --- MODIFICATIONS START ---
+        self.setWindowIcon(APP_ICON)
+        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION} - Master Password")
+        # --- MODIFICATIONS END ---
+
+        self.setModal(True)
         layout = QVBoxLayout(self)
         self.info_label = QLabel("Set up master password." if self.is_setting_up else "Enter master password.")
-        layout.addWidget(self.info_label); self.password_edit = QLineEdit(); self.password_edit.setEchoMode(QLineEdit.Password)
+        layout.addWidget(self.info_label); self.password_edit = QLineEdit(); self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(QLabel("Master Password:")); layout.addWidget(self.password_edit)
         if self.is_setting_up:
-            self.confirm_password_edit = QLineEdit(); self.confirm_password_edit.setEchoMode(QLineEdit.Password)
+            self.confirm_password_edit = QLineEdit(); self.confirm_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
             layout.addWidget(QLabel("Confirm Master Password:")); layout.addWidget(self.confirm_password_edit)
-        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept); self.button_box.rejected.connect(self.reject); layout.addWidget(self.button_box)
     def get_password(self):
         pw1 = self.password_edit.text()
@@ -157,14 +163,14 @@ class ConnectionTreeWidget(QTreeWidget):
     def __init__(self, manager, parent=None):
         super().__init__(parent)
         self.manager = manager; self.setDragEnabled(True); self.setAcceptDrops(True)
-        self.setDropIndicatorShown(True); self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDropIndicatorShown(True); self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
     def mimeTypes(self): return ['application/x-qtreewidgetitemlist']
     def mimeData(self, items):
         mime_data = QMimeData()
         if items:
             item = items[0]
             if item.text(0) == "Favorites" or (item.parent() and item.parent().text(0) == "Favorites"): return mime_data
-            idx = item.data(0, Qt.UserRole)
+            idx = item.data(0, Qt.ItemDataRole.UserRole)
             if idx is not None and 0 <= idx < len(self.manager.connections) and self.manager.connections[idx].get("type") != "folder":
                 mime_data.setText(str(idx))
         return mime_data
@@ -176,7 +182,7 @@ class ConnectionTreeWidget(QTreeWidget):
         if not (0 <= src_idx < len(self.manager.connections)): return False
         conn_to_move = self.manager.connections[src_idx]; target_fldr = "Default"
         if parent_item:
-            p_idx = parent_item.data(0, Qt.UserRole)
+            p_idx = parent_item.data(0, Qt.ItemDataRole.UserRole)
             if p_idx is not None and 0 <= p_idx < len(self.manager.connections):
                 p_data = self.manager.connections[p_idx]
                 target_fldr = p_data["name"] if p_data.get("type") == "folder" else p_data.get("folder", "Default")
@@ -197,10 +203,10 @@ class EditPane(QWidget):
         self.icon_color_label=QLabel("Icon Colour:");self.icon_color_swatch=QLabel();self.icon_color_swatch.setFixedSize(20,20);self.icon_color_swatch.setAutoFillBackground(True)
         self.icon_color_button=QPushButton("Choose...")
         self.host_edit=QLineEdit();self.protocol_combo=QComboBox();self.protocol_combo.addItems(["ssh","rdp"]);self.port_edit=QLineEdit()
-        self.username_edit=QLineEdit();self.password_edit_field=QLineEdit();self.password_edit_field.setEchoMode(QLineEdit.Password);self.notes_edit=QLineEdit()
+        self.username_edit=QLineEdit();self.password_edit_field=QLineEdit();self.password_edit_field.setEchoMode(QLineEdit.EchoMode.Password);self.notes_edit=QLineEdit()
         self.ssh_key_path_edit=QLineEdit();self.ssh_key_path_edit.setPlaceholderText("Optional path to SSH private key")
         self.ssh_key_browse_btn=QPushButton("Browse...");self.ssh_key_clear_btn=QPushButton("Clear")
-        self.ssh_key_passphrase_edit = QLineEdit();self.ssh_key_passphrase_edit.setPlaceholderText("Optional passphrase");self.ssh_key_passphrase_edit.setEchoMode(QLineEdit.PasswordEchoOnEdit)
+        self.ssh_key_passphrase_edit = QLineEdit();self.ssh_key_passphrase_edit.setPlaceholderText("Optional passphrase");self.ssh_key_passphrase_edit.setEchoMode(QLineEdit.EchoMode.PasswordEchoOnEdit)
         self.rdp_resolution_combo = QComboBox(); self.rdp_resolution_combo.addItems(RDP_RESOLUTIONS)
 
         self.display_form.addRow("Name:",self.name_edit);self.display_form.addRow("Folder:",self.folder_combo)
@@ -223,7 +229,7 @@ class EditPane(QWidget):
 
     def bind(self,manager):self.manager=manager
     def choose_icon_color(self):
-        initial_c = QColor(self._current_icon_color) if self._current_icon_color and QColor.isValidColor(self._current_icon_color) else Qt.black
+        initial_c = QColor(self._current_icon_color) if self._current_icon_color and QColor.isValidColor(self._current_icon_color) else Qt.GlobalColor.black
         color = QColorDialog.getColor(initial_c, self, "Choose Icon Colour")
         if color.isValid(): self._current_icon_color = color.name(); self.update_icon_color_swatch(self._current_icon_color); self.on_value_changed()
     def update_icon_color_swatch(self,hex_color):
@@ -244,7 +250,9 @@ class EditPane(QWidget):
             if self.ssh_key_passphrase_edit.text():self._block_signals=True;self.ssh_key_passphrase_edit.clear();self._block_signals=False
         if not is_rdp and self.rdp_resolution_combo.currentIndex()!=0:self._block_signals=True;self.rdp_resolution_combo.setCurrentText("Default");self._block_signals=False
 
-    def browse_for_ssh_key(self):k,_=QFileDialog.getOpenFileName(self,"SSH Key",os.path.expanduser("~/.ssh"),"All(*);;Keys(id*)");k and self.ssh_key_path_edit.setText(k)
+    def browse_for_ssh_key(self):
+        k, _ = QFileDialog.getOpenFileName(self, "SSH Key", os.path.expanduser("~/.ssh"), "All Files (*);;Keys (id*)")
+        if k: self.ssh_key_path_edit.setText(k)
     def clear_ssh_key(self):self.ssh_key_path_edit.clear(); self.ssh_key_passphrase_edit.clear()
     def load_connection_data(self,cd,idx):
         self._block_signals=True;self.current_item_index=idx
@@ -274,9 +282,8 @@ class EditPane(QWidget):
         elif ct=="rdp":conn["rdp_resolution"]=self.rdp_resolution_combo.currentText();conn.pop("ssh_key_path",None);conn.pop("ssh_key_passphrase_to_encrypt",None);conn.pop("ssh_key_passphrase_encrypted",None)
         else:[conn.pop(k,None)for k in["ssh_key_path","ssh_key_passphrase_to_encrypt","ssh_key_passphrase_encrypted","rdp_resolution","icon_color"]]
         self.manager.save_connections_data();self.manager.refresh_connection_list()
-        ci=self.manager.explorer.currentItem();isf=ci.data(0,Qt.UserRole+1)==True if ci else False;its=self.manager.find_item_by_index(self.current_item_index,is_fav_link=isf);its and self.manager.explorer.setCurrentItem(its)
+        ci=self.manager.explorer.currentItem();isf=ci.data(0,Qt.ItemDataRole.UserRole + 1)==True if ci else False;its=self.manager.find_item_by_index(self.current_item_index,is_fav_link=isf);its and self.manager.explorer.setCurrentItem(its)
 
-# --- ConnectionManager and other classes below... ---
 class ConnectionManager(QMainWindow):
     def __init__(self,crypto_helper,settings_data):
         super().__init__();self.crypto_helper=crypto_helper;self.settings=settings_data
@@ -287,7 +294,7 @@ class ConnectionManager(QMainWindow):
         self.active_webssh_processes = {}
         self.webssh_ports = {}
         container=QWidget();main_layout=QHBoxLayout(container);self.setCentralWidget(container)
-        splitter=QSplitter(Qt.Horizontal);main_layout.addWidget(splitter)
+        splitter=QSplitter(Qt.Orientation.Horizontal);main_layout.addWidget(splitter)
         left_pane=QWidget();left_layout=QVBoxLayout(left_pane);left_layout.setContentsMargins(0,0,0,0)
         self.search_box=QLineEdit();self.search_box.setPlaceholderText("Search (name, host, notes, port)...")
         self.search_box.textChanged.connect(self.filter_connections)
@@ -296,7 +303,7 @@ class ConnectionManager(QMainWindow):
         explorer_group=QGroupBox("Connections");explorer_layout=QVBoxLayout(explorer_group)
         self.explorer=ConnectionTreeWidget(self);self.explorer.setHeaderHidden(True)
         self.explorer.itemClicked.connect(self.handle_item_click);self.explorer.itemDoubleClicked.connect(self.launch_connection_from_item)
-        self.explorer.setContextMenuPolicy(Qt.CustomContextMenu);self.explorer.customContextMenuRequested.connect(self.show_context_menu)
+        self.explorer.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu);self.explorer.customContextMenuRequested.connect(self.show_context_menu)
         explorer_layout.addWidget(self.explorer);self.add_btn=QPushButton(QIcon.fromTheme("list-add"),"Add");self.add_folder_btn=QPushButton(FOLDER_ICON,"Folder")
         self.add_btn.clicked.connect(self.add_connection);self.add_folder_btn.clicked.connect(self.create_folder_action)
         btn_hl=QHBoxLayout();btn_hl.addWidget(self.add_btn);btn_hl.addWidget(self.add_folder_btn);explorer_layout.addLayout(btn_hl);left_layout.addWidget(explorer_group)
@@ -305,13 +312,13 @@ class ConnectionManager(QMainWindow):
         left_layout.addWidget(self.edit_pane);left_layout.setStretchFactor(explorer_group,2);left_layout.setStretchFactor(self.edit_pane,1)
         self.tabs=QTabWidget();self.tabs.setTabsClosable(True);self.tabs.tabCloseRequested.connect(self.confirm_close_tab)
         splitter.addWidget(left_pane);splitter.addWidget(self.tabs);splitter.setStretchFactor(0,1);splitter.setStretchFactor(1,2);splitter.setSizes([400,800])
-        self.create_menus();self.apply_theme(self.settings.get('theme','light'));self.refresh_connection_list()
+        self.create_menus();self.apply_theme(self.settings.get('theme','System'));self.refresh_connection_list()
 
     def find_item_by_index(self,target_idx,is_fav_link=False):
         if target_idx is None:return None
         iterator = QTreeWidgetItemIterator(self.explorer)
         while iterator.value():
-            item = iterator.value();item_data_idx = item.data(0, Qt.UserRole);item_is_fav_link = item.data(0, Qt.UserRole + 1) == True
+            item = iterator.value();item_data_idx = item.data(0, Qt.ItemDataRole.UserRole);item_is_fav_link = item.data(0, Qt.ItemDataRole.UserRole + 1) == True
             if is_fav_link:
                 if item_is_fav_link and item_data_idx == target_idx and item.parent() and item.parent().text(0) == "Favorites": return item
             else:
@@ -374,9 +381,10 @@ class ConnectionManager(QMainWindow):
     def get_folder_names(self):return sorted(list({c["name"]for c in self.connections if c.get("type")=="folder"}|{"Default"}))
 
     def refresh_connection_list(self,sel_orig_idx=None,sel_fav_link_orig_idx=None):
-        current_selection=self.explorer.currentItem();current_sel_orig_idx=current_selection.data(0,Qt.UserRole)if current_selection else None;current_sel_is_fav=current_selection.data(0,Qt.UserRole+1)==True if current_selection else False
+        current_selection=self.explorer.currentItem();current_sel_orig_idx=current_selection.data(0,Qt.ItemDataRole.UserRole)if current_selection else None;current_sel_is_fav=current_selection.data(0,Qt.ItemDataRole.UserRole+1)==True if current_selection else False
         self.explorer.clear();search_term=self.search_box.text().lower()
-        fav_fldr_item=QTreeWidgetItem(["Favorites"]);fav_fldr_item.setIcon(0,STAR_ICON);fav_fldr_item.setFlags(fav_fldr_item.flags()&~Qt.ItemIsDragEnabled&~Qt.ItemIsDropEnabled&~Qt.ItemIsEditable)
+        fav_fldr_item=QTreeWidgetItem(["Favorites"]);fav_fldr_item.setIcon(0,STAR_ICON)
+        fav_fldr_item.setFlags(fav_fldr_item.flags()&~Qt.ItemFlag.ItemIsDragEnabled&~Qt.ItemFlag.ItemIsDropEnabled&~Qt.ItemFlag.ItemIsEditable)
         self.explorer.addTopLevelItem(fav_fldr_item);font_obj=fav_fldr_item.font(0);font_obj.setBold(True);fav_fldr_item.setFont(0,font_obj);item_to_reselect=None
         for original_idx in self.favorites_indices:
             if 0<=original_idx<len(self.connections):
@@ -387,7 +395,7 @@ class ConnectionManager(QMainWindow):
                 favorite_text=conn_data.get("name","Fav")+(f" ({conn_data.get('host')})"if conn_data.get('host')else"");favorite_item=QTreeWidgetItem([favorite_text])
                 conn_type = conn_data.get("type", "ssh"); icon_color = conn_data.get("icon_color")
                 favorite_item.setIcon(0, get_icon(conn_type, icon_color) if conn_type in ["ssh", "rdp"] else (SSH_ICON if conn_type=="ssh" else RDP_ICON) )
-                favorite_item.setData(0,Qt.UserRole,original_idx);favorite_item.setData(0,Qt.UserRole+1,True);fav_fldr_item.addChild(favorite_item)
+                favorite_item.setData(0,Qt.ItemDataRole.UserRole,original_idx);favorite_item.setData(0,Qt.ItemDataRole.UserRole+1,True);fav_fldr_item.addChild(favorite_item)
                 if(sel_fav_link_orig_idx==original_idx)or(current_sel_is_fav and current_sel_orig_idx==original_idx):item_to_reselect=favorite_item
         folder_items_map={};
         for i,conn_data in enumerate(self.connections):
@@ -396,12 +404,12 @@ class ConnectionManager(QMainWindow):
             if is_folder:
                 children_match=any(not search_term or search_term in child.get("name","").lower()or search_term in child.get("host","").lower()or search_term in str(child.get("port",""))or search_term in child.get("notes","").lower()for child in self.connections if child.get("folder")==conn_data["name"])
                 if search_term and not matches_search and not children_match:continue
-                folder_item=QTreeWidgetItem([conn_data["name"]]);folder_item.setIcon(0,FOLDER_ICON);folder_item.setData(0,Qt.UserRole,i);folder_item.setFlags(folder_item.flags()&~Qt.ItemIsEditable|Qt.ItemIsDropEnabled);self.explorer.addTopLevelItem(folder_item);folder_items_map[conn_data["name"]]=folder_item
+                folder_item=QTreeWidgetItem([conn_data["name"]]);folder_item.setIcon(0,FOLDER_ICON);folder_item.setData(0,Qt.ItemDataRole.UserRole,i);folder_item.setFlags(folder_item.flags()&~Qt.ItemFlag.ItemIsEditable|Qt.ItemFlag.ItemIsDropEnabled);self.explorer.addTopLevelItem(folder_item);folder_items_map[conn_data["name"]]=folder_item
                 if(sel_orig_idx==i)or(not current_sel_is_fav and current_sel_orig_idx==i and not item_to_reselect):item_to_reselect=folder_item
             elif matches_search:
                 port_value=conn_data.get('port',DEFAULT_PORTS.get(conn_data.get('type','')));port_display=f":{port_value}"if port_value and str(port_value)!=DEFAULT_PORTS.get(conn_data.get('type',''),'')else""
                 item_text=conn_data.get("name","Un")+(f" ({conn_data.get('host')}{port_display})"if conn_data.get('host')else"");tree_item=QTreeWidgetItem([item_text])
-                tree_item.setData(0,Qt.UserRole,i);tree_item.setFlags(tree_item.flags()|Qt.ItemIsDragEnabled)
+                tree_item.setData(0,Qt.ItemDataRole.UserRole,i);tree_item.setFlags(tree_item.flags()|Qt.ItemFlag.ItemIsDragEnabled)
                 conn_type = conn_data.get("type", "ssh"); icon_color = conn_data.get("icon_color")
                 tree_item.setIcon(0, get_icon(conn_type, icon_color) if conn_type in ["ssh", "rdp"] else (SSH_ICON if conn_type=="ssh" else RDP_ICON) )
                 parent_folder_name=conn_data.get("folder","Default");parent_item_widget=folder_items_map.get(parent_folder_name)
@@ -412,7 +420,7 @@ class ConnectionManager(QMainWindow):
         if item_to_reselect: self.explorer.setCurrentItem(item_to_reselect)
 
     def handle_item_click(self,item,col=0):
-        original_idx=item.data(0,Qt.UserRole)
+        original_idx=item.data(0,Qt.ItemDataRole.UserRole)
         if item.text(0)=="Favorites":self.edit_pane.clear_and_hide();return
         if original_idx is not None and 0<=original_idx<len(self.connections):
             conn_data=self.connections[original_idx]
@@ -420,30 +428,63 @@ class ConnectionManager(QMainWindow):
             else:self.edit_pane.load_connection_data(conn_data,original_idx)
         else:self.edit_pane.clear_and_hide()
 
+    def _create_and_add_action(self, menu, icon, text, callback_func):
+        """Helper to create and add actions to a menu, for PySide6 compatibility."""
+        if isinstance(icon, str):  # For QIcon.fromTheme
+            action = QAction(QIcon.fromTheme(icon), text, self)
+        else: # For QIcon objects
+            action = QAction(icon, text, self)
+        action.triggered.connect(callback_func)
+        menu.addAction(action)
+
     def show_context_menu(self,pos):
         item=self.explorer.itemAt(pos);menu=QMenu()
-        if not item:menu.addAction(FOLDER_ICON,"New Folder",self.create_folder_action);menu.addAction(QIcon.fromTheme("list-add"),"Add Connection",self.add_connection)
+        if not item:
+            self._create_and_add_action(menu, FOLDER_ICON, "New Folder", self.create_folder_action)
+            self._create_and_add_action(menu, "list-add", "Add Connection", self.add_connection)
         else:
-            original_idx=item.data(0,Qt.UserRole);is_favorite_link=item.data(0,Qt.UserRole+1)==True;is_favorites_folder=item.text(0)=="Favorites"
-            if is_favorites_folder:menu.addAction("Clear All Favorites",self.clear_all_favorites)
+            original_idx=item.data(0,Qt.ItemDataRole.UserRole);is_favorite_link=item.data(0,Qt.ItemDataRole.UserRole+1)==True;is_favorites_folder=item.text(0)=="Favorites"
+            if is_favorites_folder:
+                clear_fav_action = QAction("Clear All Favorites", self)
+                clear_fav_action.triggered.connect(self.clear_all_favorites)
+                menu.addAction(clear_fav_action)
             elif original_idx is not None and 0<=original_idx<len(self.connections):
                 conn_data=self.connections[original_idx]
-                if conn_data.get("type")!="folder":menu.addAction(QIcon.fromTheme("media-playback-start"),"Launch",lambda:self.launch_connection_from_item(item));(menu.addAction(STAR_ICON,"Remove from Favorites",lambda:self.toggle_favorite(original_idx,False))if is_favorite_link or original_idx in self.favorites_indices else menu.addAction(STAR_ICON,"Add to Favorites",lambda:self.toggle_favorite(original_idx,True)));menu.addSeparator()
-                if not is_favorite_link:(menu.addAction("Rename Folder",lambda:self.rename_folder_action(item,original_idx))if conn_data.get("type")=="folder"else None);menu.addAction(QIcon.fromTheme("edit-delete"),"Delete Original Item",lambda:self.delete_item_action(item,original_idx))
-                elif is_favorite_link:menu.addAction(STAR_ICON,"Remove from Favorites",lambda:self.toggle_favorite(original_idx,False))
-            if not is_favorites_folder:menu.addSeparator();menu.addAction(FOLDER_ICON,"New Folder",self.create_folder_action);menu.addAction(QIcon.fromTheme("list-add"),"Add Connection",self.add_connection)
-        menu.exec_(self.explorer.viewport().mapToGlobal(pos))
+                if conn_data.get("type")!="folder":
+                    self._create_and_add_action(menu, "media-playback-start", "Launch", lambda:self.launch_connection_from_item(item))
+                    if is_favorite_link or original_idx in self.favorites_indices:
+                        self._create_and_add_action(menu, STAR_ICON, "Remove from Favorites", lambda:self.toggle_favorite(original_idx,False))
+                    else:
+                        self._create_and_add_action(menu, STAR_ICON, "Add to Favorites", lambda:self.toggle_favorite(original_idx,True))
+                    menu.addSeparator()
+                if not is_favorite_link:
+                    if conn_data.get("type")=="folder":
+                        self._create_and_add_action(menu, FOLDER_ICON, "Rename Folder", lambda:self.rename_folder_action(item,original_idx))
+                    self._create_and_add_action(menu, "edit-delete", "Delete Original Item", lambda:self.delete_item_action(item,original_idx))
+                elif is_favorite_link:
+                     self._create_and_add_action(menu, STAR_ICON, "Remove from Favorites", lambda:self.toggle_favorite(original_idx,False))
+
+            if not is_favorites_folder:
+                menu.addSeparator()
+                self._create_and_add_action(menu, FOLDER_ICON, "New Folder", self.create_folder_action)
+                self._create_and_add_action(menu, "list-add", "Add Connection", self.add_connection)
+        menu.exec(self.explorer.viewport().mapToGlobal(pos))
 
     def toggle_favorite(self,original_idx,add):
         (self.favorites_indices.append(original_idx)if add and original_idx not in self.favorites_indices else(self.favorites_indices.remove(original_idx)if not add and original_idx in self.favorites_indices else None));self.save_connections_data();self.refresh_connection_list(sel_fav_link_orig_idx=original_idx if add else None,sel_orig_idx=original_idx if not add else None)
 
     def clear_all_favorites(self):
-        (self.favorites_indices.clear(),self.save_connections_data(),self.refresh_connection_list())if QMessageBox.question(self,"Confirm","Clear all favorites?",QMessageBox.Yes|QMessageBox.No)==QMessageBox.Yes else None
+        reply = QMessageBox.question(self,"Confirm","Clear all favorites?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            self.favorites_indices.clear()
+            self.save_connections_data()
+            self.refresh_connection_list()
 
     def create_menus(self):
         menubar=self.menuBar();file_menu=menubar.addMenu("&File");view_menu=menubar.addMenu("&View");help_menu=menubar.addMenu("&Help")
         exit_action=QAction("E&xit",self);exit_action.triggered.connect(self.close);file_menu.addAction(exit_action)
-        self.theme_menu=view_menu.addMenu("Theme");light_action=QAction("Light",self,checkable=True);light_action.triggered.connect(lambda:self.switch_theme("light"))
+        self.theme_menu=view_menu.addMenu("Theme");light_action=QAction("System",self,checkable=True);light_action.triggered.connect(lambda:self.switch_theme("System"))
         dark_action=QAction("Dark",self,checkable=True);dark_action.triggered.connect(lambda:self.switch_theme("dark"));self.theme_menu.addActions([light_action,dark_action]);(dark_action if self.settings.get("theme")=="dark"else light_action).setChecked(True)
         about_action=QAction(f"About {APP_NAME}",self);about_action.triggered.connect(self.show_about_dialog);help_menu.addAction(about_action)
 
@@ -452,34 +493,38 @@ class ConnectionManager(QMainWindow):
         <h2>{APP_NAME}</h2>
         <p>SSH & RDP sessions made manageable</p>
         <p>Version: {APP_VERSION}</p>
-        <p>A powerful and intuitive utility for managing structured remote connections.
+        <p>A simple utility for managing structured remote connections.
 Organise, edit, and launch SSH and RDP sessions in a unified tabbed interface.
 Includes folder-based grouping, embedded terminal support, password and key authentication, and session persistence — all wrapped in a clean, tree-style explorer.</p>
         <p>© 2025 {APP_AUTHOR}</p>
         <p>Visit: <a href='{APP_WEBSITE}'>{APP_WEBSITE}</a></p>
-        """ # Removed SSH instances line
+        """
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle(f"About {APP_NAME}")
-        if APP_ICON and not APP_ICON.isNull(): # Use APP_ICON if valid
+        if APP_ICON and not APP_ICON.isNull():
             msg_box.setIconPixmap(APP_ICON.pixmap(64, 64))
-        else: # Fallback if APP_ICON isn't loaded or is null
-            msg_box.setIcon(QMessageBox.Information)
-        msg_box.setTextFormat(Qt.RichText)
+        else:
+            msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.setTextFormat(Qt.TextFormat.RichText)
         msg_box.setText(about_text)
-        msg_box.setStandardButtons(QMessageBox.Ok)
-        msg_box.exec_()
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
 
     def switch_theme(self,theme_name):self.settings['theme']=theme_name;self.save_current_settings();self.apply_theme(theme_name);[a.setChecked(a.text().lower().startswith(theme_name))for a in self.theme_menu.actions()]
     def apply_theme(self,theme_name):
         stylesheet="";
         if theme_name=="dark":
-            try:import qdarkstyle;stylesheet=qdarkstyle.load_stylesheet_pyqt5()
-            except ImportError:stylesheet="QMainWindow,QDialog,QWidget{background-color:#333;color:#EEE}QGroupBox{border:1px solid #555;margin-top:1ex}QGroupBox::title{subcontrol-origin:margin;subcontrol-position:top left;padding:0 3px;background-color:#444;color:#EEE}QLineEdit,QComboBox,QTreeWidget,QTabWidget::pane,QScrollArea{background-color:#444;color:#EEE;border:1px solid #555;padding:2px}QPushButton{background-color:#555;color:#EEE;border:1px solid #666;padding:5px}QPushButton:hover{background-color:#666}QPushButton:pressed{background-color:#4E4E4E}QTabBar::tab{background:#555;color:#EEE;padding:5px;border-top-left-radius:4px;border-top-right-radius:4px}QTabBar::tab:selected{background:#444}QMenu{background-color:#333;color:#EEE;border:1px solid #555}QMenu::item:selected{background-color:#555}QSplitter::handle{background-color:#555}QScrollArea{border:none}"
+            try:
+                import qdarkstyle
+                stylesheet=qdarkstyle.load_stylesheet(qt_api='pyside6')
+            except ImportError:
+                stylesheet="QMainWindow,QDialog,QWidget{background-color:#333;color:#EEE}QGroupBox{border:1px solid #555;margin-top:1ex}QGroupBox::title{subcontrol-origin:margin;subcontrol-position:top left;padding:0 3px;background-color:#444;color:#EEE}QLineEdit,QComboBox,QTreeWidget,QTabWidget::pane,QScrollArea{background-color:#444;color:#EEE;border:1px solid #555;padding:2px}QPushButton{background-color:#555;color:#EEE;border:1px solid #666;padding:5px}QPushButton:hover{background-color:#666}QPushButton:pressed{background-color:#4E4E4E}QTabBar::tab{background:#555;color:#EEE;padding:5px;border-top-left-radius:4px;border-top-right-radius:4px}QTabBar::tab:selected{background:#444}QMenu{background-color:#333;color:#EEE;border:1px solid #555}QMenu::item:selected{background-color:#555}QSplitter::handle{background-color:#555}QScrollArea{border:none}"
         self.setStyleSheet(stylesheet)
     def save_current_settings(self):save_initial_settings(self.settings)
     def rename_folder_action(self,item,folder_idx):
         if not(0<=folder_idx<len(self.connections)):return
-        old_name=self.connections[folder_idx]["name"];new_name,ok=QInputDialog.getText(self,"Rename Folder","New name:",QLineEdit.Normal,old_name)
+        old_name=self.connections[folder_idx]["name"]
+        new_name,ok = QInputDialog.getText(self,"Rename Folder","New name:", QLineEdit.EchoMode.Normal, old_name)
         if ok and new_name.strip()and new_name!=old_name:
             new_name=new_name.strip();
             if any(c.get("name")==new_name and c.get("type")=="folder"for i,c in enumerate(self.connections)if i!=folder_idx):QMessageBox.warning(self,"Error",f"Folder '{new_name}' exists.");return
@@ -489,12 +534,13 @@ Includes folder-based grouping, embedded terminal support, password and key auth
     def delete_item_action(self,item,item_idx):
         if not(0<=item_idx<len(self.connections)):return
         conn_data=self.connections[item_idx];item_name=conn_data.get("name","item");item_type="folder"if conn_data.get("type")=="folder"else"connection"
-        if QMessageBox.question(self,"Confirm Delete",f"Delete original {item_type} '{item_name}'?",QMessageBox.Yes|QMessageBox.No)==QMessageBox.Yes:
+        reply = QMessageBox.question(self,"Confirm Delete",f"Delete original {item_type} '{item_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
             if item_type=="folder"and[c for c in self.connections if c.get("folder")==item_name]:
-                reply=QMessageBox.question(self,"Folder Contents",f"Move contents of '{item_name}' to 'Default'?",QMessageBox.Yes|QMessageBox.No|QMessageBox.Cancel)
-                if reply==QMessageBox.Cancel:return
-                if reply==QMessageBox.Yes:[c.update({"folder":"Default"})for c in self.connections if c.get("folder")==item_name]
-                elif reply==QMessageBox.No:QMessageBox.information(self,"Info",f"Folder '{item_name}' not deleted.");return
+                reply=QMessageBox.question(self,"Folder Contents",f"Move contents of '{item_name}' to 'Default'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+                if reply==QMessageBox.StandardButton.Cancel:return
+                if reply==QMessageBox.StandardButton.Yes:[c.update({"folder":"Default"})for c in self.connections if c.get("folder")==item_name]
+                elif reply==QMessageBox.StandardButton.No:QMessageBox.information(self,"Info",f"Folder '{item_name}' not deleted.");return
             if item_idx in self.favorites_indices:self.favorites_indices.remove(item_idx)
             self.favorites_indices=[i if i<item_idx else i-1 for i in self.favorites_indices if i!=item_idx];del self.connections[item_idx]
             self.save_connections_data();self.refresh_connection_list();self.edit_pane.clear_and_hide()
@@ -505,11 +551,11 @@ Includes folder-based grouping, embedded terminal support, password and key auth
     def add_connection(self):
         new_idx=len(self.connections);folder_name="Default";current_item=self.explorer.currentItem()
         if current_item:
-            original_idx=current_item.data(0,Qt.UserRole);folder_name=(self.connections[original_idx]["name"]if self.connections[original_idx].get("type")=="folder"else self.connections[original_idx].get("folder","Default"))if original_idx is not None and 0<=original_idx<len(self.connections)else "Default"
+            original_idx=current_item.data(0,Qt.ItemDataRole.UserRole);folder_name=(self.connections[original_idx]["name"]if self.connections[original_idx].get("type")=="folder"else self.connections[original_idx].get("folder","Default"))if original_idx is not None and 0<=original_idx<len(self.connections)else "Default"
         self.connections.append({"name":"New Conn","folder":folder_name,"type":"ssh","port":DEFAULT_PORTS["ssh"]});self.save_connections_data();self.refresh_connection_list(sel_orig_idx=new_idx)
         newly_selected_item=self.find_item_by_index(new_idx);newly_selected_item and(self.explorer.setCurrentItem(newly_selected_item),self.handle_item_click(newly_selected_item))
     def launch_connection_from_item(self,item,col=0):
-        original_idx=item.data(0,Qt.UserRole)
+        original_idx=item.data(0,Qt.ItemDataRole.UserRole)
         if original_idx is not None and 0<=original_idx<len(self.connections):
             connection_data=self.connections[original_idx]
             if connection_data.get("type")=="folder":item.setExpanded(not item.isExpanded())
@@ -530,7 +576,7 @@ Includes folder-based grouping, embedded terminal support, password and key auth
             QMessageBox.critical(self, "WebSSH Error", f"webssh script not found: {webssh_run_script}\nBase path: {base_path}"); logging.error(f"webssh script not found: {webssh_run_script} (Base path: {base_path})"); return
         python_executable_to_use = sys.executable
         if getattr(sys, 'frozen', False):
-            bundled_python_path = os.path.join(base_path, "python.exe") 
+            bundled_python_path = os.path.join(base_path, "python.exe")
             if os.path.exists(bundled_python_path): python_executable_to_use = bundled_python_path
             else: python_executable_to_use = "python"; logging.warning(f"Frozen, bundled python not found. Trying '{python_executable_to_use}' from PATH.")
         command = [python_executable_to_use, webssh_run_script, f"--port={wssh_instance_port}", "--logging=info", "--policy=warning"]
@@ -538,11 +584,11 @@ Includes folder-based grouping, embedded terminal support, password and key auth
         try:
             logging.info(f"Launching dedicated webssh: {' '.join(command)} from cwd: {webssh_dir}")
             creation_flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        creationflags=creation_flags, text=True, bufsize=1, cwd=webssh_dir)
             max_wait, poll_int, started = 7, 0.3, False
             for _ in range(int(max_wait / poll_int)):
-                if process.poll() is not None: break 
+                if process.poll() is not None: break
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(poll_int / 2)
                 try:
                     if s.connect_ex((WEBSSH_HOST, wssh_instance_port)) == 0: started = True; logging.info(f"Webssh on port {wssh_instance_port} listening."); break
@@ -584,18 +630,10 @@ Includes folder-based grouping, embedded terminal support, password and key auth
                     if(typeof wssh !== 'undefined' && typeof wssh.connect === 'function') {
                         console.log('ConnStruct: wssh found. Connecting with opts:', opts_data);
                         wssh.connect(opts_data);
-                        
-                        var obs = new MutationObserver((m,o)=>{
-                            if(document.body.innerText.toLowerCase().match(/chan closed|connection closed|logout|session closed|authentication failed/))
-                                !window.location.hash.includes('closedByApp')&&(window.location.hash='connStructSessionClosed',o.disconnect(),window.connStructTtydMonInt&&clearInterval(window.connStructTtydMonInt))
-                        });
+                        var obs = new MutationObserver((m,o)=>{ if(document.body.innerText.toLowerCase().match(/chan closed|connection closed|logout|session closed|authentication failed/)) !window.location.hash.includes('closedByApp')&&(window.location.hash='connStructSessionClosed',o.disconnect(),window.connStructTtydMonInt&&clearInterval(window.connStructTtydMonInt)) });
                         if(document.body) obs.observe(document.body,{childList:true,subtree:true,characterData:true});
                         else console.warn('ConnStruct: document.body not ready for observer.');
-
-                        window.connStructTtydMonInt=setInterval(()=>{
-                            if(document.body&&document.body.innerText.toLowerCase().match(/chan closed|connection closed|logout|session closed|authentication failed/))
-                                !window.location.hash.includes('closedByApp')&&(window.location.hash='connStructSessionClosed',clearInterval(window.connStructTtydMonInt))
-                        },1500);
+                        window.connStructTtydMonInt=setInterval(()=>{ if(document.body&&document.body.innerText.toLowerCase().match(/chan closed|connection closed|logout|session closed|authentication failed/)) !window.location.hash.includes('closedByApp')&&(window.location.hash='connStructSessionClosed',clearInterval(window.connStructTtydMonInt)) },1500);
                     } else if (connectAttempts < maxConnectAttempts) { 
                         console.log('ConnStruct: wssh not ready, attempt:'+connectAttempts);
                         setTimeout(connect,500);
@@ -636,7 +674,8 @@ Includes folder-based grouping, embedded terminal support, password and key auth
     def confirm_close_tab(self,index):
         widget = self.tabs.widget(index)
         if widget in self.active_webssh_processes:
-            if QMessageBox.question(self,"Exit SSH","Close SSH session?",QMessageBox.Yes|QMessageBox.No)==QMessageBox.Yes:
+            reply = QMessageBox.question(self,"Exit SSH","Close SSH session?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
                 widget.page().runJavaScript("try{(document.querySelector('terminal-container')||document.querySelector('.xterm-helper-textarea')||document.body).focus(); document.execCommand('insertText',false,'exit\\n'); window.location.hash='closedByApp';}catch(e){console.error('JS exit err:',e)}")
                 if not hasattr(widget,'force_close_timer_confirm'):
                     widget.force_close_timer_confirm=QTimer(widget);widget.force_close_timer_confirm.setSingleShot(True)
@@ -644,31 +683,104 @@ Includes folder-based grouping, embedded terminal support, password and key auth
         else: self.tabs.removeTab(index); widget and widget.deleteLater()
 
     def launch_rdp_tab(self,conn_data):
-        h,p_str=conn_data.get("host"),str(conn_data.get("port",DEFAULT_PORTS["rdp"]))
+        h = conn_data.get("host")
+        p_str = str(conn_data.get("port", DEFAULT_PORTS["rdp"]))
         rdp_resolution = conn_data.get("rdp_resolution", "Default")
-        if not h:QMessageBox.warning(self,"Missing Info","Hostname missing for RDP.");return
-        addr_conn=h;
-        if p_str and p_str!=DEFAULT_PORTS["rdp"]:addr_conn=f"{h}:{p_str}"
-        info_label=QLabel(f"Launching RDP for: {addr_conn}\nResolution: {rdp_resolution}\n\nClose this tab manually.");info_label.setAlignment(Qt.AlignCenter)
-        tab_index=self.tabs.addTab(info_label,f"RDP: {conn_data.get('name',h)}");self.tabs.setCurrentIndex(tab_index)
+        username = conn_data.get("username")
+        password_decrypted = conn_data.get("password_decrypted", "")
+
+        if not h:
+            QMessageBox.warning(self, "Missing Info", "Hostname missing for RDP.")
+            return
+
+        addr_conn = h
+        if p_str and p_str != DEFAULT_PORTS["rdp"]:
+            addr_conn = f"{h}:{p_str}"
+            
+        info_label=QLabel(f"Launching RDP for: {addr_conn}\nResolution: {rdp_resolution}\n\nClose this tab manually.")
+        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        tab_index=self.tabs.addTab(info_label,f"RDP: {conn_data.get('name',h)}")
+        self.tabs.setCurrentIndex(tab_index)
+
         try:
-            command_list=["mstsc.exe",f"/v:{addr_conn}"] # Default to mstsc
-            if rdp_resolution == "Fullscreen": command_list.append("/f")
-            elif rdp_resolution != "Default":
-                try: w, ht = map(int, rdp_resolution.split('x')); command_list.extend([f"/w:{w}", f"/h:{ht}"])
-                except ValueError: logging.warning(f"Invalid RDP res: {rdp_resolution}")
+            command_list = []
+            sanitized_command_for_log = []
             
-            if sys.platform=="darwin":command_list=["open",f"rdp://{addr_conn}"] # Mac RDP client might not support w/h via open
-            elif sys.platform !="win32": # Linux
+            if sys.platform == "win32":
+                if username and password_decrypted:
+                    target = f"TERMSRV/{h}"
+                    cmdkey_command = ["cmdkey", "/generic", target, "/user", username, "/pass", password_decrypted]
+                    logging.info(f"Adding RDP credentials to Windows Credential Manager for {target}")
+                    subprocess.run(cmdkey_command, check=True, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                
+                command_list = ["mstsc.exe", f"/v:{addr_conn}"]
+                if rdp_resolution == "Fullscreen": command_list.append("/f")
+                elif rdp_resolution != "Default":
+                    try: 
+                        w, ht = map(int, rdp_resolution.split('x'))
+                        command_list.extend([f"/w:{w}", f"/h:{ht}"])
+                    except ValueError: 
+                        logging.warning(f"Invalid RDP res: {rdp_resolution}")
+                sanitized_command_for_log = command_list
+
+            elif sys.platform == "darwin":
+                uri = f"rdp://{addr_conn}"
+                if username:
+                    uri = f"rdp://{username}@{addr_conn}"
+                command_list = ["open", uri]
+                sanitized_command_for_log = command_list
+
+            else: # Linux
+                domain = ""
+                user_only = username
+                if username and "\\" in username:
+                    domain, user_only = username.split("\\", 1)
+
                 found_client = False
-                for client_try_cmd_list in [["xfreerdp",f"/v:{addr_conn}"],["rdesktop",addr_conn]]: # xfreerdp might take /w /h
-                    try:subprocess.check_call(["which",client_try_cmd_list[0]],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);command_list=client_try_cmd_list; found_client=True; break
-                    except:continue
-                if not found_client:QMessageBox.warning(self,"RDP Error","No RDP client found (xfreerdp, rdesktop).");self.tabs.removeTab(tab_index);return
+                for client in ["xfreerdp", "rdesktop"]:
+                    try:
+                        subprocess.check_call(["which", client], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        if client == "xfreerdp":
+                            command_list = ["xfreerdp", f"/v:{addr_conn}"]
+                            if rdp_resolution == "Fullscreen": command_list.append("/f")
+                            elif rdp_resolution != "Default":
+                                try: w, ht = rdp_resolution.split('x'); command_list.append(f"/size:{w}x{ht}")
+                                except ValueError: logging.warning(f"Invalid RDP res for xfreerdp: {rdp_resolution}")
+                            
+                            if user_only: command_list.append(f"/u:{user_only}")
+                            if domain: command_list.append(f"/d:{domain}")
+                            if password_decrypted: command_list.append(f"/p:{password_decrypted}")
+                            
+                            sanitized_command_for_log = [c if not c.startswith('/p:') else '/p:********' for c in command_list]
+
+                        elif client == "rdesktop":
+                            command_list = ["rdesktop", addr_conn]
+                            if user_only: command_list.extend(["-u", user_only])
+                            if domain: command_list.extend(["-d", domain])
+                            if password_decrypted: command_list.extend(["-p", password_decrypted])
+                            sanitized_command_for_log = [c if c != password_decrypted else '********' for c in command_list]
+                        
+                        found_client = True
+                        break
+                    except (subprocess.CalledProcessError, FileNotFoundError):
+                        continue
+                
+                if not found_client:
+                    QMessageBox.warning(self,"RDP Error","No RDP client found (xfreerdp, rdesktop).")
+                    self.tabs.removeTab(tab_index)
+                    return
             
-            logging.info(f"Launching RDP with command: {' '.join(command_list)}")
-            subprocess.Popen(command_list)
-        except Exception as e: logging.error(f"RDP Launch Error: {e}", exc_info=True); QMessageBox.critical(self,"RDP Launch Error",f"{e}");self.tabs.removeTab(tab_index)
+            if command_list:
+                logging.info(f"Launching RDP with command: {' '.join(map(str, sanitized_command_for_log))}")
+                subprocess.Popen(command_list)
+            else:
+                logging.error("Could not determine a command to launch RDP.")
+                self.tabs.removeTab(tab_index)
+
+        except Exception as e:
+            logging.error(f"RDP Launch Error: {e}", exc_info=True)
+            QMessageBox.critical(self, "RDP Launch Error", f"An error occurred launching the RDP client:\n\n{e}")
+            self.tabs.removeTab(tab_index)
 
     def closeEvent(self,event):
         logging.info(f"{APP_NAME} closing. Terminating active webssh instances.")
@@ -677,7 +789,6 @@ Includes folder-based grouping, embedded terminal support, password and key auth
             self.cleanup_webssh_instance(term_widget)
         super().closeEvent(event)
 
-# --- Main Application Logic ---
 def main_app_logic():
     base_path = get_application_path()
     logging.info(f"Application base path at startup: {base_path}")
@@ -690,7 +801,7 @@ def main_app_logic():
     if 'master_hash' in settings and 'master_salt' in settings:
         for attempt_num in range(3):
             dialog=MasterPasswordDialog(is_setting_up=False)
-            if dialog.exec_()==QDialog.Accepted:
+            if dialog.exec()==QDialog.DialogCode.Accepted:
                 password_entered=dialog.get_password()
                 if password_entered and crypto.verify_master_password(settings['master_hash'],settings['master_salt'],password_entered):
                     crypto.derive_fernet_key(password_entered,settings['master_salt']);master_ok=True;break
@@ -700,17 +811,17 @@ def main_app_logic():
     else:
         logging.info("No master password found, initiating setup.")
         dialog=MasterPasswordDialog(is_setting_up=True)
-        if dialog.exec_()==QDialog.Accepted:
+        if dialog.exec()==QDialog.DialogCode.Accepted:
             password_entered=dialog.get_password()
             if password_entered:
-                salt_val=crypto.generate_salt();settings.update({'master_salt':salt_val,'master_hash':crypto.hash_master_password(password_entered,salt_val),'theme':'light'});save_initial_settings(settings);crypto.derive_fernet_key(password_entered,salt_val);master_ok=True
+                salt_val=crypto.generate_salt();settings.update({'master_salt':salt_val,'master_hash':crypto.hash_master_password(password_entered,salt_val),'theme':'System'});save_initial_settings(settings);crypto.derive_fernet_key(password_entered,salt_val);master_ok=True
                 logging.info("Master password setup successful.")
             else:logging.error("Pwd setup failed (empty or mismatch).");sys.exit("Pwd setup failed.")
         else:logging.info("Master password setup cancelled by user.");sys.exit("Pwd setup cancelled.")
     if not master_ok:logging.critical("Master pwd not verified/set.");sys.exit("Master pwd not verified/set.")
     
     logging.info(f"{APP_NAME} starting UI...")
-    window=ConnectionManager(crypto,settings);window.show();sys.exit(QApplication.instance().exec_())
+    window=ConnectionManager(crypto,settings);window.show();sys.exit(QApplication.instance().exec())
 
 if __name__ == '__main__':
     if sys.platform.startswith('win'):
