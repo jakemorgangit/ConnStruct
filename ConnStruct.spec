@@ -10,7 +10,7 @@ a = Analysis(
     binaries=[],
     datas=[('webssh', 'webssh'), ('folder_shell_icon.ico', '.')], # Assuming your icon is at the root
     hiddenimports=[
-        'PyQt5.QtWebEngineWidgets',
+        'pyside6',
         'paramiko', # Add webssh dependency
         'tornado',  # Add webssh dependency
         # Add any other submodules if PyInstaller still misses them, e.g.:
