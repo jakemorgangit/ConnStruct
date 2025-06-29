@@ -82,7 +82,7 @@ ConnStruct then loads the `webssh` page in an embedded browser view within the t
 4.  **Install Python Dependencies:**
     *   Install ConnStruct's direct dependencies:
         ```bash
-        pip install Pysides6 cryptography qdarkstyle
+        pip install pyside6 cryptography qdarkstyle
         ```
     *   Install `webssh`'s dependencies:
         ```bash
@@ -111,7 +111,7 @@ You can package `ConnStruct` into a single Windows executable (`.exe`) using PyI
     Navigate to your `ConnStruct` project root directory in the terminal (with the virtual environment activated) and run the following command:
 
     ```bash
-    pyinstaller --onefile --name ConnStruct --windowed --icon="folder_shell_icon.ico" --add-data "webssh:webssh" --add-data "folder_shell_icon.ico:." --hidden-import "pysides6" --hidden-import "paramiko" --hidden-import "tornado" --hidden-import "bcrypt" --hidden-import "pynacl" ConnStruct.py
+    pyinstaller --onefile --name ConnStruct --windowed --icon="folder_shell_icon.ico" --add-data "webssh:webssh" --add-data "folder_shell_icon.ico:." --hidden-import "pyside6" --hidden-import "paramiko" --hidden-import "tornado" --hidden-import "bcrypt" --hidden-import "pynacl" ConnStruct.py
     ```
 
     **Explanation of PyInstaller flags:**
