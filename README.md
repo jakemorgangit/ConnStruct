@@ -2,7 +2,7 @@
 
 **SSH and RDP - Organise. Connect. Control.**
 
-**Version:** 1.4.1
+**Version:** 1.5.0
 
 **Author:** Jake Morgan [https://dba.wales](https://dba.wales)
 
@@ -82,7 +82,7 @@ ConnStruct then loads the `webssh` page in an embedded browser view within the t
 4.  **Install Python Dependencies:**
     *   Install ConnStruct's direct dependencies:
         ```bash
-        pip install PyQt5 PyQtWebEngine cryptography qdarkstyle
+        pip install Pysides6 cryptography qdarkstyle
         ```
     *   Install `webssh`'s dependencies:
         ```bash
@@ -111,7 +111,7 @@ You can package `ConnStruct` into a single Windows executable (`.exe`) using PyI
     Navigate to your `ConnStruct` project root directory in the terminal (with the virtual environment activated) and run the following command:
 
     ```bash
-    pyinstaller --onefile --name ConnStruct --windowed --icon="folder_shell_icon.ico" --add-data "webssh:webssh" --add-data "folder_shell_icon.ico:." --hidden-import "PyQt5.QtWebEngineWidgets" --hidden-import "paramiko" --hidden-import "tornado" --hidden-import "bcrypt" --hidden-import "pynacl" ConnStruct.py
+    pyinstaller --onefile --name ConnStruct --windowed --icon="folder_shell_icon.ico" --add-data "webssh:webssh" --add-data "folder_shell_icon.ico:." --hidden-import "pysides6" --hidden-import "paramiko" --hidden-import "tornado" --hidden-import "bcrypt" --hidden-import "pynacl" ConnStruct.py
     ```
 
     **Explanation of PyInstaller flags:**
@@ -121,7 +121,7 @@ You can package `ConnStruct` into a single Windows executable (`.exe`) using PyI
     *   `--icon="folder_shell_icon.ico"`: Specifies your application icon.
     *   `--add-data "webssh:webssh"`: Bundles the entire `webssh` sub-directory. The `webssh` folder (source) will be available as a `webssh` folder (destination) at the root of the bundled application's temporary extraction path.
     *   `--add-data "folder_shell_icon.ico:."`: Bundles the icon file to the root of the extraction path.
-    *   `--hidden-import "PyQt5.QtWebEngineWidgets"`: Ensures this necessary Qt module is included.
+    *   `--hidden-import "pysides6"`: Ensures this necessary Qt module is included.
     *   `--hidden-import "paramiko"`: Includes the Paramiko library (a dependency of `webssh`).
     *   `--hidden-import "tornado"`: Includes the Tornado library (a dependency of `webssh`).
     *   `--hidden-import "bcrypt"` and `--hidden-import "pynacl"`: These are often required by `paramiko` and might be missed by PyInstaller's auto-detection. Including them can prevent runtime errors.
